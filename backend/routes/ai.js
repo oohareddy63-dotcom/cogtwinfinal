@@ -1,5 +1,5 @@
 /**
- * Groq AI Routes
+ * gemini AI Routes
  * POST /api/ai/insights        — personalized AI insights
  * POST /api/ai/recommendations — smart recommendations
  * POST /api/ai/explain-anomaly — explain an anomaly
@@ -95,7 +95,7 @@ router.post("/insights", protect, async (req, res) => {
       return res.status(503).json({ error: "AI service temporarily unavailable. Using fallback insights." });
     }
 
-    res.json({ insights, model: "llama-3.1-8b-instant", source: "groq" });
+    res.json({ insights, model: "gemini-1.5-flash", source: "gemini" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -116,7 +116,7 @@ router.post("/recommendations", protect, async (req, res) => {
       return res.status(503).json({ error: "AI service temporarily unavailable." });
     }
 
-    res.json({ recommendations, model: "llama-3.1-8b-instant", source: "groq" });
+    res.json({ recommendations, model: "gemini-1.5-flash", source: "gemini" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -136,7 +136,7 @@ router.post("/explain-anomaly", protect, async (req, res) => {
       return res.status(503).json({ error: "AI service temporarily unavailable." });
     }
 
-    res.json({ explanation, model: "llama-3.1-8b-instant", source: "groq" });
+    res.json({ explanation, model: "gemini-1.5-flash", source: "gemini" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -152,7 +152,7 @@ router.get("/weekly-report", protect, async (req, res) => {
       return res.status(503).json({ error: "AI service temporarily unavailable." });
     }
 
-    res.json({ summary, model: "llama-3.1-8b-instant", source: "groq" });
+    res.json({ summary, model: "gemini-1.5-flash", source: "gemini" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -177,7 +177,7 @@ router.post("/ask", protect, async (req, res) => {
       return res.status(503).json({ error: "AI service temporarily unavailable." });
     }
 
-    res.json({ answer, question, model: "llama-3.1-8b-instant", source: "groq" });
+    res.json({ answer, question, model: "gemini-1.5-flash", source: "gemini" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

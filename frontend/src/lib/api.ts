@@ -76,6 +76,8 @@ export const testsApi = {
   },
   sessions: (limit?: number) =>
     request<{ sessions: SessionData[] }>(`/tests/sessions${limit ? "?limit=" + limit : ""}`),
+  getQuestions: (type: "pattern" | "decision") =>
+    request<{ questions: AIQuestion[]; source: string }>(`/tests/questions/${type}`),
 };
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -150,6 +152,17 @@ export const aiApi = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
+
+export interface AIQuestion {
+  // Pattern type
+  seq?: (number | string)[];
+  answer?: number;
+  options?: number[];
+  // Decision type
+  q?: string;
+  a?: string;
+  opts?: string[];
+}
 
 export type CognitiveMonitoringStatusType =
   | "Low Concern"

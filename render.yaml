@@ -13,8 +13,12 @@ services:
         value: 5000
       - key: JWT_EXPIRES_IN
         value: 7d
-      # Add these in Render dashboard manually (secrets):
-      # MONGODB_URI, JWT_SECRET, GROQ_API_KEY, FRONTEND_URL
+      # Set these as secrets in Render Dashboard → Environment:
+      # MONGODB_URI      — your MongoDB Atlas connection string
+      # JWT_SECRET       — any long random string
+      # GEMINI_API_KEY   — for AI chat, insights, recommendations
+      # GROQ_API_KEY     — for test question generation
+      # FRONTEND_URL     — https://digital-cognitive-twin-1.onrender.com
 
   # ─── Frontend Static Site ──────────────────────────────────────────────────
   - type: web

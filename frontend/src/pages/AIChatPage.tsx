@@ -24,7 +24,7 @@ const AIChatPage = () => {
     {
       id: 0,
       role: "assistant",
-      content: "Hi! I'm your CogTwin AI assistant powered by Groq (Llama 3.1). I can answer questions about your cognitive health, explain your test results, and give personalized advice. What would you like to know?",
+      content: "Hi! I'm your CogTwin AI assistant powered by Google Gemini. I can answer questions about your cognitive health, explain your test results, and give personalized advice. What would you like to know?",
     },
   ]);
   const [input, setInput]     = useState("");
@@ -82,7 +82,7 @@ const AIChatPage = () => {
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             CogTwin AI Assistant
             <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-normal">
-              Groq · Llama 3.1
+              Gemini · Flash
             </span>
           </h1>
           <p className="text-xs text-muted-foreground">Ask anything about your cognitive health</p>
@@ -90,7 +90,7 @@ const AIChatPage = () => {
         <button
           onClick={() => setMessages([{
             id: 0, role: "assistant",
-            content: "Hi! I'm your CogTwin AI assistant. How can I help you today?",
+            content: "Hi! I'm your CogTwin AI assistant powered by Google Gemini. How can I help you today?",
           }])}
           className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
           title="Clear chat"

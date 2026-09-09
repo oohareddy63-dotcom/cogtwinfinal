@@ -11,6 +11,7 @@ const {
   extractFeatures,
   trainDigitalTwin,
 } = require("../ml/cognitiveEngine");
+const { generateTestQuestions } = require("../ml/questionGenerator");
 
 const router = express.Router();
 
@@ -278,6 +279,26 @@ router.get("/session/:sessionId", protect, async (req, res) => {
     res.json({ session });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/tests/questions/:type ──────────────────────────────────────────
+// Returns 5 AI-generated questions for pattern or decision tests.
+// Falls back gracefully if Gemini is unavailable.
+router.get("/questions/:type", protect, async (req, res) => {
+  const { type } = req.params;
+  if (!["pattern", "decision"].includes(type)) {
+    return res.status(400).json({ error: "type must be 'pattern' or 'decision'" });
+  }
+  try {
+    const questions = await generateTestQuestions(type, 5);
+    if (!questions) {
+      return res.status(503).json({ error: "AI unavailable, use local fallback" });
+    }
+    res.json({ questions, source: "ai" });
+  } catch (err) {
+    console.error("Question generation error:", err.message);
+    res.status(503).json({ error: "AI unavailable, use local fallback" });
   }
 });
 

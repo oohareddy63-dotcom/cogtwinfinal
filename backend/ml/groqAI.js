@@ -1,44 +1,58 @@
 /**
- * Groq AI Service — Real LLM-powered insights using llama3-8b-8192
+ * AI Service — Powered by Google Gemini (gemini-1.5-flash)
+ * Drop-in replacement for the original Groq/Llama service.
+ * Free tier: 1,500 requests/day, no expiry.
+ *
  * Used for:
  *  - Personalized cognitive health insights
  *  - Smart recommendations
  *  - Anomaly explanations
  *  - Weekly report summaries
+ *  - Health Q&A
+ *  - Health risk report
  */
-const Groq = require("groq-sdk");
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MODEL = "llama-3.1-8b-instant";
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const MODEL = "gemini-3.6-flash";
+
 // ─── Core chat helper ─────────────────────────────────────────────────────────
 async function chat(systemPrompt, userPrompt, maxTokens = 512) {
   try {
-    const completion = await groq.chat.completions.create({
+    const model = genAI.getGenerativeModel({
       model: MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user",   content: userPrompt   },
-      ],
-      max_tokens: maxTokens,
-      temperature: 0.7,
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+      },
     });
-    return completion.choices[0]?.message?.content?.trim() || null;
+
+    const result = await model.generateContent(userPrompt);
+    const text = result.response.text()?.trim();
+    return text || null;
   } catch (err) {
-    console.error("Groq API error:", err.message);
+    console.error("Gemini API error:", err.message);
     return null;
   }
 }
+
 // ─── 1. Generate personalized AI insights ────────────────────────────────────
 async function generatePersonalizedInsights(userData) {
   const {
     name, overallScore, baseline, cognitiveMetrics,
     trend, anomalyAlerts, sessionCount, daysSinceLastTest,
   } = userData;
+
   const metricsText = cognitiveMetrics
     .map((m) => `${m.name}: ${m.score ?? "N/A"} (baseline: ${m.baseline ?? "N/A"}, change: ${m.change > 0 ? "+" : ""}${m.change})`)
     .join(", ");
+
   const anomalyText = anomalyAlerts?.length
     ? anomalyAlerts.map((a) => `${a.testType} is ${a.severity} (z=${a.zScore}, ${a.direction} baseline)`).join("; ")
     : "No anomalies detected";
+
   const system = `You are CogTwin, an AI cognitive health assistant. You analyze brain health data and provide 
 concise, empathetic, actionable insights. Always be encouraging but honest. Keep each insight to 1-2 sentences.
 Respond ONLY with a JSON array of 3 insight objects with fields: type ("positive"|"warning"|"info"), title (max 6 words), description (1-2 sentences).`;
@@ -58,7 +72,6 @@ Generate 3 personalized cognitive health insights for this user.`;
   if (!raw) return null;
 
   try {
-    // Extract JSON array from response
     const match = raw.match(/\[[\s\S]*\]/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
@@ -178,21 +191,13 @@ Question: ${question}`;
   return await chat(system, user, 400);
 }
 
-// ─── 6. Generate AI Health Risk & Associations Report ──────────────────────
+// ─── 6. Generate AI Health Risk & Associations Report ─────────────────────────
 async function generateHealthRiskReport(userData) {
   const {
-    name,
-    baseline,
-    currentScores,
-    historicalScores,
-    zScores,
-    anomalySeverities,
-    deviationPercentages,
-    trendSlopes,
-    r2,
-    consecutiveDecliningSessions,
-    affectedDomains,
-    sessionCount,
+    name, baseline, currentScores, historicalScores,
+    zScores, anomalySeverities, deviationPercentages,
+    trendSlopes, r2, consecutiveDecliningSessions,
+    affectedDomains, sessionCount,
   } = userData;
 
   const system = `You are CogTwin, an AI cognitive health assistant. Analyze brain health data to generate a medically cautious interpretation.
@@ -245,14 +250,13 @@ Analyze the data and generate the structured JSON health risk interpretation.`;
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
 
-    // Validate required fields
     if (!parsed.cognitiveMonitoringStatus || !Array.isArray(parsed.potentialAssociations)) {
       return null;
     }
 
     return parsed;
   } catch (err) {
-    console.error("Groq health risk report parse error:", err);
+    console.error("Gemini health risk report parse error:", err);
     return null;
   }
 }
@@ -265,4 +269,3 @@ module.exports = {
   answerHealthQuestion,
   generateHealthRiskReport,
 };
-

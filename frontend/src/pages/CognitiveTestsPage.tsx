@@ -4,7 +4,7 @@ import {
   Brain, Zap, Eye, Target, GitBranch,
   CheckCircle, Play, RotateCcw, Loader2, AlertTriangle,
 } from "lucide-react";
-import { testsApi, type SessionSummary } from "@/lib/api";
+import { testsApi, type SessionSummary, type AIQuestion } from "@/lib/api";
 
 type TestType = "reaction" | "memory" | "pattern" | "attention" | "decision";
 type TestState = "idle" | "running" | "complete";
@@ -156,21 +156,79 @@ const MemoryTest = ({ onComplete }: { onComplete: (score: number, duration: numb
 };
 
 // ─── Pattern Test ─────────────────────────────────────────────────────────────
-const PatternTest = ({ onComplete }: { onComplete: (score: number, duration: number) => void }) => {
-  const [round, setRound]         = useState(1);
-  const [totalScore, setTotalScore] = useState(0);
-  const [feedback, setFeedback]   = useState<"correct" | "wrong" | null>(null);
-  const sessionStart               = useRef(Date.now());
+const ALL_PATTERNS: AIQuestion[] = [
+  { seq: [2, 4, 6, 8, "?"],        answer: 10,   options: [9, 10, 11, 12]          },
+  { seq: [1, 1, 2, 3, 5, "?"],     answer: 8,    options: [6, 7, 8, 9]             },
+  { seq: [3, 6, 12, 24, "?"],      answer: 48,   options: [36, 48, 30, 42]         },
+  { seq: [1, 4, 9, 16, "?"],       answer: 25,   options: [20, 25, 30, 36]         },
+  { seq: [2, 6, 18, 54, "?"],      answer: 162,  options: [108, 162, 216, 72]      },
+  { seq: [5, 10, 15, 20, "?"],     answer: 25,   options: [22, 24, 25, 30]         },
+  { seq: [1, 3, 7, 15, "?"],       answer: 31,   options: [29, 30, 31, 32]         },
+  { seq: [100, 50, 25, "?"],       answer: 12,   options: [10, 12, 13, 15]         },
+  { seq: [7, 14, 21, 28, "?"],     answer: 35,   options: [33, 34, 35, 42]         },
+  { seq: [0, 1, 4, 9, 16, "?"],    answer: 25,   options: [20, 23, 25, 36]         },
+  { seq: [81, 27, 9, 3, "?"],      answer: 1,    options: [0, 1, 2, 3]             },
+  { seq: [2, 3, 5, 7, 11, "?"],    answer: 13,   options: [12, 13, 14, 15]         },
+  { seq: [1, 8, 27, 64, "?"],      answer: 125,  options: [100, 115, 125, 216]     },
+  { seq: [4, 8, 16, 32, "?"],      answer: 64,   options: [48, 56, 64, 128]        },
+  { seq: [3, 9, 27, 81, "?"],      answer: 243,  options: [162, 243, 324, 729]     },
+  { seq: [10, 9, 7, 4, "?"],       answer: 0,    options: [0, 1, 2, 3]             },
+  { seq: [1, 2, 4, 7, 11, "?"],    answer: 16,   options: [14, 15, 16, 17]         },
+  { seq: [5, 15, 45, 135, "?"],    answer: 405,  options: [270, 405, 540, 675]     },
+  { seq: [256, 64, 16, 4, "?"],    answer: 1,    options: [1, 2, 3, 4]             },
+  { seq: [2, 5, 10, 17, 26, "?"],  answer: 37,   options: [34, 35, 37, 40]         },
+  { seq: [1, 3, 6, 10, 15, "?"],   answer: 21,   options: [18, 19, 21, 22]         },
+  { seq: [6, 11, 21, 41, "?"],     answer: 81,   options: [71, 81, 91, 101]        },
+  { seq: [3, 5, 8, 13, 21, "?"],   answer: 34,   options: [29, 32, 34, 36]         },
+  { seq: [16, 4, 1, "?"],          answer: 0,    options: [0, 1, 2, 4]             },
+  { seq: [2, 4, 12, 48, "?"],      answer: 240,  options: [96, 192, 240, 288]      },
+];
 
-  const patterns = [
-    { seq: [2, 4, 6, 8, "?"],      answer: 10,  options: [9, 10, 11, 12]       },
-    { seq: [1, 1, 2, 3, 5, "?"],   answer: 8,   options: [6, 7, 8, 9]          },
-    { seq: [3, 6, 12, 24, "?"],    answer: 48,  options: [36, 48, 30, 42]      },
-    { seq: [1, 4, 9, 16, "?"],     answer: 25,  options: [20, 25, 30, 36]      },
-    { seq: [2, 6, 18, 54, "?"],    answer: 162, options: [108, 162, 216, 72]   },
-  ];
+function pickPatterns(count: number): AIQuestion[] {
+  const shuffled = [...ALL_PATTERNS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+const PatternTest = ({ onComplete }: { onComplete: (score: number, duration: number) => void }) => {
+  const [round, setRound]           = useState(1);
+  const [totalScore, setTotalScore] = useState(0);
+  const [feedback, setFeedback]     = useState<"correct" | "wrong" | null>(null);
+  const [patterns, setPatterns]     = useState<AIQuestion[]>([]);
+  const [loadingQ, setLoadingQ]     = useState(true);
+  const sessionStart                = useRef(Date.now());
+
+  // Fetch AI questions on mount; fall back to local pool if AI fails
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingQ(true);
+    testsApi.getQuestions("pattern")
+      .then((res) => {
+        if (!cancelled && res.questions?.length >= 5) {
+          setPatterns(res.questions);
+        } else {
+          if (!cancelled) setPatterns(pickPatterns(5));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPatterns(pickPatterns(5));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingQ(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loadingQ) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Generating unique questions with AI…</p>
+      </div>
+    );
+  }
 
   const current = patterns[round - 1];
+  if (!current) return null;
 
   const handleAnswer = (val: number) => {
     const correct = val === current.answer;
@@ -192,7 +250,7 @@ const PatternTest = ({ onComplete }: { onComplete: (score: number, duration: num
     <div className="flex flex-col items-center gap-6">
       <p className="text-muted-foreground text-sm">Round {round}/{patterns.length} — What comes next?</p>
       <div className="flex gap-3 text-2xl font-mono font-bold text-foreground flex-wrap justify-center">
-        {current.seq.map((n, i) => (
+        {current.seq!.map((n, i) => (
           <span key={i} className={n === "?" ? "gradient-text text-3xl" : ""}>{n}</span>
         ))}
       </div>
@@ -202,7 +260,7 @@ const PatternTest = ({ onComplete }: { onComplete: (score: number, duration: num
         </p>
       )}
       <div className="grid grid-cols-2 gap-3">
-        {current.options.map((opt) => (
+        {current.options!.map((opt) => (
           <button
             key={opt}
             onClick={() => handleAnswer(opt)}
@@ -288,43 +346,105 @@ const AttentionTest = ({ onComplete }: { onComplete: (score: number, duration: n
 };
 
 // ─── Decision Test ────────────────────────────────────────────────────────────
-const DecisionTest = ({ onComplete }: { onComplete: (score: number, duration: number) => void }) => {
-  const [round, setRound]         = useState(1);
-  const [totalScore, setTotalScore] = useState(0);
-  const [timeLeft, setTimeLeft]   = useState(6);
-  const [answered, setAnswered]   = useState(false);
-  const sessionStart               = useRef(Date.now());
+const ALL_DECISIONS: AIQuestion[] = [
+  { q: "Which number is largest?",                           a: "847",      opts: ["748", "847", "784", "478"]              },
+  { q: "Hot is to Cold as Day is to…",                       a: "Night",    opts: ["Morning", "Night", "Evening", "Noon"]   },
+  { q: "Which shape has the most sides?",                    a: "Hexagon",  opts: ["Triangle", "Square", "Pentagon", "Hexagon"] },
+  { q: "Odd one out (not a fruit):",                         a: "Carrot",   opts: ["Apple", "Banana", "Carrot", "Grape"]    },
+  { q: "2 + 2 × 2 = ?",                                     a: "6",        opts: ["8", "6", "4", "10"]                     },
+  { q: "Which is heavier: 1kg iron or 1kg feathers?",        a: "Same",     opts: ["Iron", "Feathers", "Same", "Depends"]   },
+  { q: "Next in sequence: 2, 4, 8, 16, ?",                  a: "32",       opts: ["24", "32", "20", "28"]                  },
+  { q: "Which planet is closest to the Sun?",                a: "Mercury",  opts: ["Venus", "Earth", "Mercury", "Mars"]     },
+  { q: "What comes next: Monday, Wednesday, Friday, ?",      a: "Sunday",   opts: ["Sunday", "Saturday", "Thursday", "Tuesday"] },
+  { q: "Odd one out (not a primary colour):",                a: "Green",    opts: ["Red", "Blue", "Green", "Yellow"]        },
+  { q: "Which is NOT a programming language?",               a: "Cobra",    opts: ["Python", "Ruby", "Cobra", "Swift"]      },
+  { q: "5² + 3² = ?",                                       a: "34",       opts: ["30", "32", "34", "64"]                  },
+  { q: "Fast is to Slow as Loud is to…",                     a: "Quiet",    opts: ["Soft", "Quiet", "Silent", "Low"]        },
+  { q: "How many sides does a pentagon have?",               a: "5",        opts: ["4", "5", "6", "7"]                      },
+  { q: "Which number is a prime?",                           a: "17",       opts: ["15", "16", "17", "18"]                  },
+  { q: "Odd one out (not an ocean):",                        a: "Amazon",   opts: ["Pacific", "Atlantic", "Amazon", "Arctic"] },
+  { q: "What is 15% of 200?",                                a: "30",       opts: ["20", "25", "30", "35"]                  },
+  { q: "Which comes first alphabetically?",                  a: "Elephant", opts: ["Tiger", "Elephant", "Lion", "Zebra"]    },
+  { q: "Light travels faster than…",                         a: "Sound",    opts: ["Water", "Sound", "Wind", "Electricity"] },
+  { q: "Square root of 144?",                                a: "12",       opts: ["10", "11", "12", "14"]                  },
+  { q: "Which is the largest continent?",                    a: "Asia",     opts: ["Africa", "Asia", "Europe", "Australia"] },
+  { q: "3 + 3 ÷ 3 = ?",                                     a: "4",        opts: ["2", "3", "4", "6"]                      },
+  { q: "Odd one out (not a mammal):",                        a: "Salmon",   opts: ["Whale", "Bat", "Salmon", "Dolphin"]     },
+  { q: "Which month has 28 days minimum every year?",        a: "February", opts: ["January", "February", "March", "April"] },
+  { q: "What is the next prime after 11?",                   a: "13",       opts: ["12", "13", "14", "15"]                  },
+  { q: "Bird is to Sky as Fish is to…",                      a: "Water",    opts: ["Ocean", "Water", "River", "Sea"]        },
+  { q: "100 ÷ 4 × 2 = ?",                                   a: "50",       opts: ["12.5", "25", "50", "200"]               },
+  { q: "Which is NOT a type of triangle?",                   a: "Circular", opts: ["Scalene", "Isosceles", "Circular", "Equilateral"] },
+  { q: "How many minutes in 2.5 hours?",                     a: "150",      opts: ["120", "135", "150", "180"]              },
+];
 
-  const questions = [
-    { q: "Which number is largest?",                          a: "847",     opts: ["748", "847", "784", "478"]          },
-    { q: "Hot is to Cold as Day is to…",                      a: "Night",   opts: ["Morning", "Night", "Evening", "Noon"] },
-    { q: "Which shape has the most sides?",                   a: "Hexagon", opts: ["Triangle", "Square", "Pentagon", "Hexagon"] },
-    { q: "Odd one out (not a fruit):",                        a: "Carrot",  opts: ["Apple", "Banana", "Carrot", "Grape"] },
-    { q: "2 + 2 × 2 = ?",                                    a: "6",       opts: ["8", "6", "4", "10"]                 },
-    { q: "Which is heavier: 1kg iron or 1kg feathers?",       a: "Same",    opts: ["Iron", "Feathers", "Same", "Depends"] },
-    { q: "Next in sequence: 2, 4, 8, 16, ?",                 a: "32",      opts: ["24", "32", "20", "28"]              },
-  ];
+function pickDecisions(count: number): AIQuestion[] {
+  const shuffled = [...ALL_DECISIONS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+const DecisionTest = ({ onComplete }: { onComplete: (score: number, duration: number) => void }) => {
+  const [round, setRound]           = useState(1);
+  const [totalScore, setTotalScore] = useState(0);
+  const [timeLeft, setTimeLeft]     = useState(6);
+  const [answered, setAnswered]     = useState(false);
+  const [questions, setQuestions]   = useState<AIQuestion[]>([]);
+  const [loadingQ, setLoadingQ]     = useState(true);
+  const sessionStart                = useRef(Date.now());
+
+  // Fetch AI questions on mount; fall back to local pool if AI fails
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingQ(true);
+    testsApi.getQuestions("decision")
+      .then((res) => {
+        if (!cancelled && res.questions?.length >= 5) {
+          setQuestions(res.questions);
+        } else {
+          if (!cancelled) setQuestions(pickDecisions(5));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setQuestions(pickDecisions(5));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingQ(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const ROUNDS = 5;
-  const current = questions[(round - 1) % questions.length];
+  const current = questions[(round - 1) % Math.max(questions.length, 1)];
 
   useEffect(() => {
+    if (loadingQ || !current) return;
     setTimeLeft(6);
     setAnswered(false);
     const t = setInterval(() => setTimeLeft((v) => v - 1), 1000);
     return () => clearInterval(t);
-  }, [round]);
+  }, [round, loadingQ, current]);
 
   useEffect(() => {
+    if (loadingQ || !current) return;
     if (timeLeft <= 0 && !answered) {
-      // Time ran out — no score for this round
       if (round >= ROUNDS) {
         onComplete(totalScore, Math.round((Date.now() - sessionStart.current) / 1000));
       } else {
         setRound((r) => r + 1);
       }
     }
-  }, [timeLeft, answered, round, totalScore, onComplete]);
+  }, [timeLeft, answered, round, totalScore, onComplete, loadingQ, current]);
+
+  if (loadingQ) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Generating unique questions with AI…</p>
+      </div>
+    );
+  }
+
+  if (!current) return null;
 
   const handleAnswer = (opt: string) => {
     if (answered) return;
@@ -360,7 +480,7 @@ const DecisionTest = ({ onComplete }: { onComplete: (score: number, duration: nu
       </div>
       <p className="text-foreground font-semibold text-center text-lg">{current.q}</p>
       <div className="grid grid-cols-2 gap-3 w-full">
-        {current.opts.map((opt) => (
+        {current.opts!.map((opt) => (
           <button
             key={opt}
             onClick={() => handleAnswer(opt)}
