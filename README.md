@@ -2,7 +2,7 @@
 
 > A web-based AI system that creates a personalized Digital Twin of your cognitive behavior using brain games, machine learning, Google Gemini AI, and Groq AI.
 
-**Live Demo:** https://digital-cognitive-twin-1.onrender.com
+**Live Demo:** 
 
 ---
 
