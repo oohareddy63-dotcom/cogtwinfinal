@@ -168,7 +168,7 @@ const DigitalTwinPage = () => {
           </motion.div>
 
           <motion.div variants={fadeUp} custom={2} className="glass-card p-5 space-y-2">
-            <p className="text-xs text-muted-foreground">Model Accuracy</p>
+            <p className="text-xs text-muted-foreground">User Performance Score</p>
             <p className="text-3xl font-bold gradient-text">
               {twin?.accuracy != null ? `${twin.accuracy}%` : "—"}
             </p>
@@ -178,7 +178,7 @@ const DigitalTwinPage = () => {
           </motion.div>
 
           <motion.div variants={fadeUp} custom={3} className="glass-card p-5 space-y-2">
-            <p className="text-xs text-muted-foreground">Trend Direction</p>
+            <p className="text-xs text-muted-foreground">User Performance Trend</p>
             <div className="flex items-center gap-2">
               {trend?.direction === "improving" ? (
                 <><TrendingUp className="w-5 h-5 text-green-400" /><span className="font-semibold text-green-400">Improving</span></>
